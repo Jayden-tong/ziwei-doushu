@@ -39,12 +39,13 @@ export async function generateMetadata({ params }: { params: Promise<{ star: str
   const { star: slug, topic } = await params;
   const star = SLUG_TO_STAR[slug];
   if (!star) return {};
+  if (!ALL_TOPICS.includes(topic as TopicKey)) return {};
   const data = getKnowledge(star, topic as TopicKey);
-  if (!data.exists) return {};
+  const palaceName = formatPalaceName(data.palaceName);
 
-  const title = `${star}入${data.palaceName}宫 · ${data.topicLabel} · 倪海夏体系详解`;
+  const title = `${star}入${palaceName} · ${data.topicLabel} · 倪海夏体系详解`;
   const description = data.parsed.dingdiao
-    || `${star}入${data.palaceName}宫的紫微斗数解读 — 基于倪海夏《天纪》体系与古籍《紫微斗数全集》《骨髓赋》。`;
+    || `${star}入${palaceName}的紫微斗数解读 — 基于倪海夏《天纪》体系与古籍《紫微斗数全集》《骨髓赋》。`;
 
   return {
     title,
@@ -70,19 +71,21 @@ export default async function KnowledgePage({ params }: { params: Promise<{ star
   const { star: slug, topic } = await params;
   const star = SLUG_TO_STAR[slug];
   if (!star) notFound();
+  if (!ALL_TOPICS.includes(topic as TopicKey)) notFound();
   const data = getKnowledge(star, topic as TopicKey);
-  if (!data.exists) notFound();
+  const hasContent = data.exists;
+  const palaceName = formatPalaceName(data.palaceName);
 
   // 同主星其他 topic
-  const otherTopicsForStar = ALL_TOPICS.filter(t => t !== topic && getKnowledge(star, t).exists);
+  const otherTopicsForStar = ALL_TOPICS.filter(t => t !== topic && (hasContent ? getKnowledge(star, t).exists : true));
   // 同 topic 其他主星
-  const otherStarsForTopic = ALL_STARS.filter(s => s !== star && getKnowledge(s, topic as TopicKey).exists);
+  const otherStarsForTopic = ALL_STARS.filter(s => s !== star && (hasContent ? getKnowledge(s, topic as TopicKey).exists : true));
 
   // JSON-LD
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Article',
-    headline: `${star}入${data.palaceName}宫 · ${data.topicLabel}`,
+    headline: `${star}入${palaceName} · ${data.topicLabel}`,
     description: data.parsed.dingdiao,
     author: { '@type': 'Organization', name: '紫微研究 · 倪海夏正宗' },
     publisher: {
@@ -124,7 +127,7 @@ export default async function KnowledgePage({ params }: { params: Promise<{ star
           <span style={{ margin: '0 8px' }}>/</span>
           <span>{star}</span>
           <span style={{ margin: '0 8px' }}>·</span>
-          <span style={{ color: 'var(--ac)' }}>{data.palaceName}宫</span>
+          <span style={{ color: 'var(--ac)' }}>{palaceName}</span>
         </nav>
 
         {/* 标题区 */}
@@ -133,7 +136,7 @@ export default async function KnowledgePage({ params }: { params: Promise<{ star
             {data.topicLabel} · 倪海夏体系详解
           </div>
           <h1 style={{ fontSize: 'clamp(28px, 5vw, 44px)', fontWeight: 700, color: 'var(--tx-0)', letterSpacing: '0.1em', lineHeight: 1.2 }}>
-            {star}入{data.palaceName}宫
+            {star}入{palaceName}
           </h1>
           {STAR_BRIEF_SEO[star] && (
             <p style={{ fontSize: '13px', color: 'var(--tx-2)', marginTop: '14px', lineHeight: 1.8 }}>
@@ -141,6 +144,18 @@ export default async function KnowledgePage({ params }: { params: Promise<{ star
             </p>
           )}
         </header>
+
+        {!hasContent && (
+          <Section title="当前版本说明" gradient>
+            <div style={{ fontSize: '15px', color: 'var(--tx-0)', lineHeight: 2, letterSpacing: '0.02em' }}>
+              这个地址已经可以访问，但开源版暂未包含「{star}入{palaceName}」的详细解读正文。
+              <br />
+              当前仓库开放的是排盘引擎、页面框架、古籍原文和基础知识结构；完整的 14 主星 × 13 主题论断库没有随开源版提供。
+              <br />
+              后续可以用我们已经下载好的样本数据，或自己整理的命理知识库，把这里补成正式内容页。
+            </div>
+          </Section>
+        )}
 
         {/* 内容 4 段 */}
         {data.parsed.dingdiao && (
@@ -233,7 +248,7 @@ export default async function KnowledgePage({ params }: { params: Promise<{ star
         </Section>
 
         {/* 内链：同 topic 其他主星 */}
-        <Section title={`其他主星入${data.palaceName}宫的解读`} minimal>
+        <Section title={`其他主星入${palaceName}的解读`} minimal>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {otherStarsForTopic.slice(0, 13).map(s => (
               <Link
@@ -310,4 +325,8 @@ function Section({ title, children, gradient, minimal }: { title: string; childr
       </div>
     </section>
   );
+}
+
+function formatPalaceName(name: string) {
+  return name.endsWith('宫') ? name : `${name}宫`;
 }
